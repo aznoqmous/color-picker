@@ -11,6 +11,8 @@ export default class ColorPicker {
 
         this.colorCanvasContainer = this.createElement('div', {class:"color canvas-container"}, this.container)
         this.colorCircle = this.createElement('i', {class:"color-circle"}, this.colorCanvasContainer)
+        this.colorCircle.x = 0
+        this.colorCircle.y = 0
         this.colorCanvas = this.createElement('canvas', {
             width: 200,
             height: 100
@@ -30,6 +32,8 @@ export default class ColorPicker {
         this.colorRow = this.createElement('div', {class: "color-row"}, this.container)
         this.colorDisplay = this.createElement('span', {class: "color-display"}, this.colorRow)
         this.colorInput = this.createElement('input', {type: "text"}, this.colorRow)
+
+        this.updateColorDisplay()
     }
 
     bind(){
@@ -65,8 +69,6 @@ export default class ColorPicker {
         let y = e.pageY - rect.y
         this.colorCircle.x = x
         this.colorCircle.y = y
-        this.colorCircle.style.left = this.colorCircle.x + "px"
-        this.colorCircle.style.top = this.colorCircle.y + "px"
         this.updateColorDisplay()
     }
     pickHue(e){
@@ -80,6 +82,8 @@ export default class ColorPicker {
     }
     updateColorDisplay(){
         this.hueCircle.style.left = this.color.hsla.h / 360 * 100 + "%"
+        this.colorCircle.style.left = this.colorCircle.x + "px"
+        this.colorCircle.style.top = this.colorCircle.y + "px"
         this.color = Color.fromImageData(this.colorCanvasCtx.getImageData(this.colorCircle.x, this.colorCircle.y, 1, 1).data)
         this.colorInput.value = this.color.rgba.toString()
         this.colorDisplay.style.background = this.color.rgba.toString()
