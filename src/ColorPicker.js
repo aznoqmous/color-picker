@@ -1,7 +1,20 @@
-export default class ColorPicker {
-    constructor(colorString=null){
+import "./extensions"
+
+export default class ColorPicker extends EventTarget {
+    constructor(opts={}){
+        super()
+        this.opts = Object.assign({
+            defaultFormat: "hexa",
+            width: 200,
+            height: 100
+        }, opts)
+
         this.color = new Color()
-        console.log(this)
+        this.formats = {
+            hexa: HexaColor,
+            rgba: RgbaColor,
+            hsla: HslaColor
+        }
         this.build()
         this.bind()
     }
@@ -14,8 +27,8 @@ export default class ColorPicker {
         this.colorCircle.x = 0
         this.colorCircle.y = 0
         this.colorCanvas = this.createElement('canvas', {
-            width: 200,
-            height: 100
+            width: this.opts.width,
+            height: this.opts.height
         }, this.colorCanvasContainer)
         this.colorCanvasCtx = this.colorCanvas.getContext('2d')
         this.updateColorCanvas()
@@ -23,7 +36,7 @@ export default class ColorPicker {
         this.hueCanvasContainer = this.createElement('div', {class:"hue canvas-container"}, this.container)
         this.hueCircle = this.createElement('i', {class:"color-circle"}, this.hueCanvasContainer)
         this.hueCanvas = this.createElement('canvas', {
-            width: 200,
+            width: this.opts.width,
             height: 10
         }, this.hueCanvasContainer)
         this.hueCanvasCtx = this.hueCanvas.getContext('2d')
@@ -33,7 +46,22 @@ export default class ColorPicker {
         this.colorDisplay = this.createElement('span', {class: "color-display"}, this.colorRow)
         this.colorInput = this.createElement('input', {type: "text"}, this.colorRow)
 
+        this.formatSelect = this.createElement('select', {class: "format-select"}, this.colorRow)
+        Object.keys(this.formats).map(key => {
+            this.formatSelect.add(new Option(key, key, this.opts.defaultFormat == key))
+        })
         this.updateColorDisplay()
+    }
+
+    get selectedFormatKey(){
+        return this.formatSelect.selectedOptions[0].value
+    }
+
+    guessFormat(string){
+        if(string.match(/^rgb/)) return 'rgba'
+        if(string.match(/^#/)) return 'hexa'
+        if(string.match(/^hsl/)) return 'hsla'
+        return this.selectedFormatKey
     }
 
     bind(){
@@ -57,9 +85,25 @@ export default class ColorPicker {
         this.hueCanvas.addEventListener('mousemove', (e)=>{ this.pickHue(e)})
 
         this.colorInput.addEventListener('input', ()=>{
-            this.color = new Color(this.colorInput.value)
-            
+            let value = this.colorInput.value
+            let selectionStart = this.colorInput.selectionStart
+            this.formatSelect.value = this.guessFormat(value)
+            this.color = new Color(value)
+            this.colorCircle.x = this.color.hsla.s / 100 * this.colorCanvas.width
+            this.colorCircle.y =  (1 - this.color.hsla.l / 100) * this.colorCanvas.height
+            this.updateColorCanvas()
+            this.updateColorDisplay()
+            this.colorInput.value = value
+            this.colorInput.selectionStart = selectionStart
+            this.colorInput.selectionEnd = selectionStart
+            this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
         })
+        this.colorInput.addEventListener('focus', ()=> this.colorInput.select())
+        this.formatSelect.addEventListener('input', ()=>{
+            this.updateColorDisplay()
+            this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
+        })
+
     }
 
     pickColor(e){
@@ -70,22 +114,25 @@ export default class ColorPicker {
         this.colorCircle.x = x
         this.colorCircle.y = y
         this.updateColorDisplay()
+        this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
     }
     pickHue(e){
         if(!this.mouseDown) return;
         let rect = this.hueCanvas.getBoundingClientRect()
         let x = e.pageX - rect.x
-        let y = e.pageY - rect.y
         this.color.hsla.h = x / rect.width * 360
         this.updateColorCanvas()
         this.updateColorDisplay()
+        this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
     }
     updateColorDisplay(){
         this.hueCircle.style.left = this.color.hsla.h / 360 * 100 + "%"
         this.colorCircle.style.left = this.colorCircle.x + "px"
         this.colorCircle.style.top = this.colorCircle.y + "px"
+        this.colorCircle.x = Math.clamp(this.colorCircle.x, 0, this.colorCanvas.width-1)
+        this.colorCircle.y = Math.clamp(this.colorCircle.y, 0, this.colorCanvas.height-1)
         this.color = Color.fromImageData(this.colorCanvasCtx.getImageData(this.colorCircle.x, this.colorCircle.y, 1, 1).data)
-        this.colorInput.value = this.color.rgba.toString()
+        this.colorInput.value = this.color[this.selectedFormatKey].toHumanString()
         this.colorDisplay.style.background = this.color.rgba.toString()
         this.colorCircle.style.background = this.color.rgba.toString()
         this.colorCircle.style.outlineColor = this.color.rgba.toString()
@@ -105,10 +152,10 @@ export default class ColorPicker {
         let currentColor = new HslaColor(this.color.hsla.h, 0, 0, 1)
         let l = 0
         for(let y = 0; y < this.colorCanvas.height; y++){
-            l = (this.colorCanvas.height - y) / this.colorCanvas.height * 255
+            l = (1 - y/ this.colorCanvas.height)
             for(let x = 0; x < this.colorCanvas.width; x++){
                 currentColor.s = x / this.colorCanvas.width * 255
-                currentColor.l = l * ((this.colorCanvas.width - x) / this.colorCanvas.width / 2 + 0.5)
+                currentColor.l = l * 255
                 this.colorCanvasCtx.fillStyle = currentColor.toString()
                 this.colorCanvasCtx.fillRect(x, y, 1, 1)
             }
@@ -159,6 +206,9 @@ export class RgbaColor {
     }
     toString(){
         return `rgba(${this.r},${this.g},${this.b},${this.a})`
+    }
+    toHumanString(){
+        return this.toString()
     }
     toHexa(){
         let r = this.r.toString(16);
@@ -235,6 +285,9 @@ export class HexaColor{
     toString(){
         return `#${this.r}${this.g}${this.b}${this.a}`
     }
+    toHumanString(){
+        return this.toString()
+    }
 }
 
 export class HslaColor{
@@ -246,5 +299,19 @@ export class HslaColor{
     }
     toString(){
         return `hsla(${this.h},${this.s/255*100}%,${this.l/255*100}%,${this.a})`
+    }
+    toHumanString(){
+        return `hsla(${this.h},${Math.round(this.s/255*100)}%,${Math.round(this.l/255*100)}%,${this.a})`
+    }
+}
+
+export const ColorPickerEvents = {
+    update: "colorPicker_update"
+}
+
+export class ColorPickerUpdateEvent extends Event {
+    constructor(value){
+        super(ColorPickerEvents.update)
+        this.value = value
     }
 }
