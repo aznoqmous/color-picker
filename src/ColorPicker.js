@@ -51,7 +51,12 @@ export default class ColorPicker extends EventTarget {
         Object.keys(this.formats).map(key => {
             this.formatSelect.add(new Option(key, key, this.opts.defaultFormat == key))
         })
+
+        this.setColorFromString(this.opts.defaultColor)
+        this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
+
         this.updateColorDisplay()
+
     }
 
     get selectedFormatKey(){
@@ -88,13 +93,7 @@ export default class ColorPicker extends EventTarget {
         this.colorInput.addEventListener('input', ()=>{
             let value = this.colorInput.value
             let selectionStart = this.colorInput.selectionStart
-            this.formatSelect.value = this.guessFormat(value)
-            this.color = new Color(value)
-            this.colorCircle.x = this.color.hsla.s / 100 * this.colorCanvas.width
-            this.colorCircle.y =  (1 - this.color.hsla.l / 100) * this.colorCanvas.height
-            this.updateColorCanvas()
-            this.updateColorDisplay()
-            this.colorInput.value = value
+            this.setColorFromString(value)
             this.colorInput.selectionStart = selectionStart
             this.colorInput.selectionEnd = selectionStart
             this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
@@ -107,11 +106,20 @@ export default class ColorPicker extends EventTarget {
 
     }
 
+    setColorFromString(value){
+        this.formatSelect.value = this.guessFormat(value)
+        this.color = new Color(value)
+        this.colorCircle.x = this.color.hsla.s / 100 * this.colorCanvas.width
+        this.colorCircle.y =  (1 - this.color.hsla.l / 100) * this.colorCanvas.height
+        this.updateColorCanvas()
+        this.updateColorDisplay()
+        this.colorInput.value = value
+    }
     pickColor(e){
         if(!this.mouseDown) return;
         let rect = this.colorCanvas.getBoundingClientRect()
         let x = e.pageX - rect.x
-        let y = e.pageY - rect.y
+        let y = e.pageY - rect.y - window.scrollY
         this.colorCircle.x = x
         this.colorCircle.y = y
         this.updateColorDisplay()
