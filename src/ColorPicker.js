@@ -4,12 +4,13 @@ export default class ColorPicker extends EventTarget {
     constructor(opts={}){
         super()
         this.opts = Object.assign({
+            defaultColor: "#ffffff",
             defaultFormat: "hexa",
             width: 200,
             height: 100
         }, opts)
 
-        this.color = new Color()
+        this.color = new Color(this.opts.defaultColor)
         this.formats = {
             hexa: HexaColor,
             rgba: RgbaColor,

@@ -1,5 +1,5 @@
 import ColorPicker, { ColorPickerEvents } from "./ColorPicker";
-
+import "../scss/style.scss"
 
 document.addEventListener('DOMContentLoaded', ()=>{
     let cp = new ColorPicker()
