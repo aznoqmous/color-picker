@@ -2,7 +2,7 @@
 
 a light js color picker
 
-![Color picker preview](./color-picker.png)
+![Color picker preview](https://github.com/aznoqmous/color-picker/color-picker.png)
 
 ## Get started
 ```js
