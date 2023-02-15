@@ -11,7 +11,6 @@ let cp = new ColorPicker({
     // Default values
     defaultColor: "#ffffff",
     defaultFormat: "hexa",
-    allowedFormats: "hexa,hsla,rgba"
     width: 200, // canvas width
     height: 100 // canvas height
 })
