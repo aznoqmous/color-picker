@@ -3,19 +3,29 @@ import "./extensions"
 export default class ColorPicker extends EventTarget {
     constructor(opts={}){
         super()
+
         this.opts = Object.assign({
             defaultColor: "#ffffff",
-            defaultFormat: "hexa",
+            formats: "hex,rgb,hsl",
             width: 200,
             height: 100
         }, opts)
 
         this.color = new Color(this.opts.defaultColor)
-        this.formats = {
+        this.defaultFormats = {
             hexa: HexaColor,
             rgba: RgbaColor,
-            hsla: HslaColor
+            hsla: HslaColor,
+            hex: HexaColor,
+            rgb: RgbaColor,
+            hsl: HslaColor
         }
+        this.formats = Object.fromEntries(
+            Object.keys(this.defaultFormats)
+            .filter(key => this.opts.formats.split(',').includes(key))
+            .map(key => [key, this.defaultFormats[key]])
+        )
+
         this.build()
         this.bind()
     }
@@ -48,25 +58,36 @@ export default class ColorPicker extends EventTarget {
         this.colorInput = this.createElement('input', {type: "text"}, this.colorRow)
 
         this.formatSelect = this.createElement('select', {class: "format-select"}, this.colorRow)
-        Object.keys(this.formats).map(key => {
-            this.formatSelect.add(new Option(key, key, this.opts.defaultFormat == key))
+        Object.keys(this.formats).map((key, i) => {
+            this.formatSelect.add(new Option(key, key, !i))
         })
 
         this.setColorFromString(this.opts.defaultColor)
         this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
 
         this.updateColorDisplay()
-
+        this.colorInput.value = this.opts.defaultColor
     }
 
     get selectedFormatKey(){
         return this.formatSelect.selectedOptions[0].value
     }
 
+    isFormatEnabled(formatKey){
+        return Object.keys(this.formats).includes(formatKey)
+    }
     guessFormat(string){
-        if(string.match(/^rgb/)) return 'rgba'
-        if(string.match(/^#/)) return 'hexa'
-        if(string.match(/^hsl/)) return 'hsla'
+        let format =  this.selectedFormatKey
+        if(string.match(/^rgb/) && this.isFormatEnabled('rgb')) format = 'rgb'
+        if(string.match(/^rgba/) && this.isFormatEnabled('rgba')) format = 'rgba'
+        if(string.match(/^hsl/) && this.isFormatEnabled('hsl')) format = 'hsl'
+        if(string.match(/^hsla/) && this.isFormatEnabled('hsla')) format = 'hsla'
+        if(string.match(/^#/)) {
+            if(this.isFormatEnabled('hex')) format = 'hex'
+            if(this.isFormatEnabled('hexa')) format = 'hexa'
+            if(this.isFormatEnabled('hexa') && this.isFormatEnabled('hex')) format = (string.length - 1) % 3 ? 'hexa' : 'hex'
+        }
+        if(this.isFormatEnabled(format)) return format
         return this.selectedFormatKey
     }
 
@@ -109,8 +130,9 @@ export default class ColorPicker extends EventTarget {
     setColorFromString(value){
         this.formatSelect.value = this.guessFormat(value)
         this.color = new Color(value)
-        this.colorCircle.x = this.color.hsla.s / 100 * this.colorCanvas.width
-        this.colorCircle.y =  (1 - this.color.hsla.l / 100) * this.colorCanvas.height
+        console.log(this.color)
+        this.colorCircle.x = this.color.hsla.s / 255 * this.colorCanvas.width
+        this.colorCircle.y =  (1 - this.color.hsla.l / 255) * this.colorCanvas.height
         this.updateColorCanvas()
         this.updateColorDisplay()
         this.colorInput.value = value
@@ -142,7 +164,7 @@ export default class ColorPicker extends EventTarget {
         this.colorCircle.y = Math.clamp(this.colorCircle.y, 0, this.colorCanvas.height-1)
         this.color = Color.fromImageData(this.colorCanvasCtx.getImageData(this.colorCircle.x, this.colorCircle.y, 1, 1).data)
         this.colorInput.value = this.color[this.selectedFormatKey].toHumanString()
-        this.colorDisplay.style.background = this.color.rgba.toString()
+        this.colorDisplay.style.background = this.colorInput.value
         this.colorCircle.style.background = this.color.rgba.toString()
         this.colorCircle.style.outlineColor = this.color.rgba.toString()
     }
@@ -186,8 +208,11 @@ export class Color {
 
     setFromString(colorString){
         this.rgba = Color.stringToRGBA(colorString)
-        this.hexa = this.rgba.toHexa()
-        this.hsla = this.rgba.toHsla()
+        this.hexa = this.toHexa()
+        this.hsla = this.toHsla()
+        this.rgb = new RgbColor(this.rgba.r, this.rgba.g, this.rgba.b)
+        this.hex = new HexColor(this.hexa.r, this.hexa.g, this.hexa.b)
+        this.hsl = new HslColor(this.hsla.h, this.hsla.s, this.hsla.l)
     }
 
     static fromImageData(datas){
@@ -204,26 +229,12 @@ export class Color {
         let datas = ctx.getImageData(0, 0, 1, 1).data
         return new RgbaColor(datas[0], datas[1], datas[2], datas[3])
     }
-}
 
-export class RgbaColor {
-    constructor(r, g, b, a){
-        this.r = r
-        this.g = g
-        this.b = b
-        this.a = a
-    }
-    toString(){
-        return `rgba(${this.r},${this.g},${this.b},${this.a})`
-    }
-    toHumanString(){
-        return this.toString()
-    }
     toHexa(){
-        let r = this.r.toString(16);
-        let g = this.g.toString(16);
-        let b = this.b.toString(16);
-        let a = this.a.toString(16);
+        let r = this.rgba.r.toString(16);
+        let g = this.rgba.g.toString(16);
+        let b = this.rgba.b.toString(16);
+        let a = this.rgba.a.toString(16);
       
         if (r.length == 1)
           r = "0" + r;
@@ -238,9 +249,9 @@ export class RgbaColor {
     }
     toHsla(){
         // Make r, g, and b fractions of 1
-        let r = this.r / 255;
-        let g = this.g / 255;
-        let b = this.b / 255;
+        let r = this.rgba.r / 255;
+        let g = this.rgba.g / 255;
+        let b = this.rgba.b / 255;
 
         // Find greatest and smallest channel values
         let cmin = Math.min(r,g,b),
@@ -277,10 +288,53 @@ export class RgbaColor {
         s = delta == 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
 
         // Multiply l and s by 100
-        s = +(s * 100).toFixed(1);
-        l = +(l * 100).toFixed(1);
+        s = +(s * 255).toFixed(1);
+        l = +(l * 255).toFixed(1);
 
-        return new HslaColor(h,s,l,this.a);
+        return new HslaColor(h,s,l,this.rgba.a);
+    }
+}
+
+export class RgbColor {
+    constructor(r, g, b){
+        this.r = r
+        this.g = g
+        this.b = b
+    }
+    toString(){
+        return `rgb(${this.r},${this.g},${this.b})`
+    }
+    toHumanString(){
+        return this.toString()
+    }
+}
+
+export class RgbaColor {
+    constructor(r, g, b, a){
+        this.r = r
+        this.g = g
+        this.b = b
+        this.a = a
+    }
+    toString(){
+        return `rgba(${this.r},${this.g},${this.b},${this.a})`
+    }
+    toHumanString(){
+        return `rgba(${this.r},${this.g},${this.b},${Math.floor(this.a/255*100)/100})`
+    }
+}
+
+export class HexColor{
+    constructor(r, g, b){
+        this.r = r
+        this.g = g
+        this.b = b
+    }
+    toString(){
+        return `#${this.r}${this.g}${this.b}`
+    }
+    toHumanString(){
+        return this.toString()
     }
 }
 
@@ -299,6 +353,20 @@ export class HexaColor{
     }
 }
 
+export class HslColor{
+    constructor(h,s,l){
+        this.h = h
+        this.s = s
+        this.l = l
+    }
+    toString(){
+        return `hsl(${this.h},${this.s/255*100}%,${this.l/255*100}%)`
+    }
+    toHumanString(){
+        return `hsl(${this.h},${Math.round(this.s/255*100)}%,${Math.round(this.l/255*100)}%)`
+    }
+}
+
 export class HslaColor{
     constructor(h,s,l,a){
         this.h = h
@@ -310,7 +378,7 @@ export class HslaColor{
         return `hsla(${this.h},${this.s/255*100}%,${this.l/255*100}%,${this.a})`
     }
     toHumanString(){
-        return `hsla(${this.h},${Math.round(this.s/255*100)}%,${Math.round(this.l/255*100)}%,${this.a})`
+        return `hsla(${this.h},${Math.round(this.s/255*100)}%,${Math.round(this.l/255*100)}%,${Math.floor(this.a/255*100)/100})`
     }
 }
 
