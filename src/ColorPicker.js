@@ -118,16 +118,12 @@ export default class ColorPicker extends EventTarget {
             this.colorInput.selectionStart = selectionStart
             this.colorInput.selectionEnd = selectionStart
             this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
-            this.colorInput.dispatchEvent(new Event('input'))
-            this.colorInput.dispatchEvent(new Event('change'))
 
         })
         this.colorInput.addEventListener('focus', ()=> this.colorInput.select())
         this.formatSelect.addEventListener('input', ()=>{
             this.updateColorDisplay()
             this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
-            this.colorInput.dispatchEvent(new Event('input'))
-            this.colorInput.dispatchEvent(new Event('change'))
         })
 
     }
@@ -151,8 +147,6 @@ export default class ColorPicker extends EventTarget {
         this.colorCircle.y = y
         this.updateColorDisplay()
         this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
-        this.colorInput.dispatchEvent(new Event('input'))
-        this.colorInput.dispatchEvent(new Event('change'))
     }
     pickHue(e){
         if(!this.mouseDown) return;
@@ -162,8 +156,6 @@ export default class ColorPicker extends EventTarget {
         this.updateColorCanvas()
         this.updateColorDisplay()
         this.dispatchEvent(new ColorPickerUpdateEvent(this.colorInput.value))
-        this.colorInput.dispatchEvent(new Event('input'))
-        this.colorInput.dispatchEvent(new Event('change'))
     }
     updateColorDisplay(){
         this.hueCircle.style.left = this.color.hsla.h / 360 * 100 + "%"
